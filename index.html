@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Legend of Licháld - Co-op Multiplayer Edition</title>
+    <!-- A stílusok betöltése a külön fájlból -->
+    <link rel="stylesheet" href="style.css">
+    <!-- Playroom Multiplayer Motor -->
+    <script src="https://unpkg.com/playroomkit/multiplayer.full.umd.js" crossorigin="anonymous"></script>
+</head>
+<body>
+
+    <div id="startScreen" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(circle, #2c1635 0%, #0d131a 100%); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 100;">
+        <div class="title-container">
+            <h1 id="gameTitleMain">Legend of Licháld</h1>
+        </div>
+        <button class="ui-btn" style="font-size: 26px; padding: 15px 45px;" onclick="startGame()">Kaland megkezdése / Start Game</button>
+    </div>
+
+    <div id="mainMenu" class="modal-screen" style="display: none;">
+        <h1 style="color: #ffcc00; text-shadow: 0 0 15px rgba(255,204,0,0.5);">Legend of Licháld</h1>
+        <div class="menu-grid">
+            <button class="ui-btn" style="font-size: 22px; min-width: 350px;" onclick="openCharacterSelect('single')">⚔️ Egyjátékos / Single Player</button>
+            <button class="ui-btn" style="font-size: 22px; min-width: 350px; background: linear-gradient(135deg, #8e44ad 0%, #2c1635 100%); border-color: #ffd700;" onclick="startMultiplayerCoop()">🌐 Új Co-op Szoba (Host)</button>
+            <button class="ui-btn" style="font-size: 20px; min-width: 350px; background-color: #2980b9; border-color: #3498db; color: #fff;" onclick="showJoinMenu()">🚪 Csatlakozás Kóddal (Join)</button>
+            <button class="ui-btn" style="font-size: 18px; min-width: 350px; background-color: #222; border-color: #444; color: #666;" disabled onclick="alertComingSoon()">⚙️ Beállítások (Zárva)</button>
+        </div>
+    </div>
+
+    <div id="joinMenuScreen" class="modal-screen" style="display: none;">
+        <h1>🚪 Csatlakozás Szobához</h1>
+        <p style="color: #b39ddb; margin-bottom: 20px; font-size: 18px;">Írd be a Házigazda által kapott 4 betűs szobakódot:</p>
+        <input type="text" id="roomCodeInput" maxlength="4" autocomplete="off" spellcheck="false" style="font-size: 36px; text-align: center; text-transform: uppercase; width: 180px; letter-spacing: 8px; background: #1a0b2e; color: #00ffff; border: 2px solid #00ffff; border-radius: 8px; padding: 10px; margin-bottom: 20px; outline: none; font-weight: bold;">
+        <br>
+        <div style="margin-top: 20px; display: flex; gap: 15px; justify-content: center;">
+            <button class="ui-btn" onclick="joinMultiplayerByCode()">Csatlakozás / Join</button>
+            <button class="ui-btn" onclick="closeJoinMenu()" style="background: #333; border-color: #666; font-size: 18px;">Vissza</button>
+        </div>
+    </div>
+
+    <div id="hostConfigScreen" class="modal-screen" style="display: none;">
+        <h1>⚙️ Szoba Beállítások</h1>
+        
+        <div style="background: rgba(0,0,0,0.5); padding: 15px; border-radius: 8px; border: 2px dashed #00ffff; margin-bottom: 25px;">
+            <span style="font-size: 18px; color: #ccc;">A Te Szobakódod:</span><br>
+            <span id="displayRoomCode" style="font-size: 48px; color: #00ffff; font-weight: bold; letter-spacing: 10px; text-shadow: 0 0 15px rgba(0,255,255,0.5);">ABCD</span>
+            <p style="font-size: 14px; color: #aaa; margin-top: 5px;">Oszd meg ezt a kódot a barátaiddal a csatlakozáshoz!</p>
+        </div>
+
+        <p style="color: #b39ddb; margin-bottom: 15px;">Válaszd ki a csapat szabályait a harc megkezdése előtt:</p>
+        
+        <div class="form-row">
+            <span>Hősosztályok szabálya:</span>
+            <select id="configUniqueClasses">
+                <option value="true">Csak egyedi hősök (Max 1 harcos / vándor / mág)</option>
+                <option value="false">Bármilyen kombináció megengedett</option>
+            </select>
+        </div>
+
+        <div class="form-row">
+            <span>XP és Loot elosztás:</span>
+            <select id="configSharedProgression">
+                <option value="true">Közös fejlődés (Shared XP & Loot)</option>
+                <option value="false">Egyéni fejlődés (Mindenki magának gyűjt)</option>
+            </select>
+        </div>
+
+        <div style="margin-top: 30px;">
+            <button class="ui-btn" style="padding: 15px 45px;" onclick="confirmHostConfig()">Játék Indítása / Launch Game</button>
+        </div>
+    </div>
+
+    <!-- KIBŐVÍTETT KARAKTERVÁLASZTÓ KÉPERNYŐ -->
+    <div id="charSelectScreen" class="modal-screen" style="display: none; max-width: 900px; width: 95%;">
+        <h1 id="charSelectTitle">VÁLASSZ HŐST!</h1>
+        <p id="charSelectWarning" style="font-size: 18px; color: #e74c3c; font-weight: bold; min-height: 25px; margin: 5px 0;"></p>
+        
+        <div style="display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; align-items: stretch;">
+            
+            <!-- Bal oldal: Játékosok Lobby Listája -->
+            <div id="lobbyContainer" style="flex: 1; min-width: 250px; background: rgba(26, 15, 46, 0.8); border: 2px solid #5b2c6f; border-radius: 10px; padding: 15px; text-align: left; display: none;">
+                <h2 style="color: #ffd700; margin-top: 0; font-size: 20px; border-bottom: 1px solid #5b2c6f; padding-bottom: 10px;">Csapat Állapota</h2>
+                <ul id="lobbyPlayerList" style="list-style: none; padding: 0; margin: 0; color: white;">
+                    <!-- A JavaScript ide tölti be a játékosokat -->
+                </ul>
+            </div>
+            
+            <!-- Jobb oldal: Választható Kártyák -->
+            <div class="cards-grid" style="flex: 2; margin: 0;">
+                <div class="char-card active-selectable" id="char-wizard" onclick="selectCharacter('wizard')">
+                    <div class="char-icon">🧙‍♂️</div>
+                    <div class="char-title">Varázsló (Wizard)</div>
+                    <div class="char-desc">A mágia mestere. Tűzgolyókkal pusztít távolról.</div>
+                </div>
+                <div class="char-card active-selectable" id="char-warrior" onclick="selectCharacter('warrior')">
+                    <div class="char-icon">🛡️</div>
+                    <div class="char-title">Harcos (Warrior)</div>
+                    <div class="char-desc">Közelharci pusztító fénylő ezüst páncélban, elsöprő kardcsapásokkal.</div>
+                </div>
+                <div class="char-card active-selectable" id="char-ranger" onclick="selectCharacter('ranger')">
+                    <div class="char-icon">🏹</div>
+                    <div class="char-title">Vándor (Ranger)</div>
+                    <div class="char-desc">Taktikai íjász. Természeti gyógyfüvek és állati társak segítik.</div>
+                </div>
+            </div>
+        </div>
+        
+        <div style="margin-top: 25px;">
+            <button id="charStartBtn" class="ui-btn" style="font-size: 26px; padding: 16px 50px; min-width: 300px;" disabled onclick="confirmCharacterSelection()">Készen állok! / Ready!</button>
+            <br>
+            <button class="ui-btn" onclick="backToMainMenu()" style="background: #333; border-color: #666; font-size: 16px; padding: 10px 20px; margin-top: 15px; color: #ccc;">Vissza / Back</button>
+        </div>
+    </div>
+
+    <div id="bossHpContainer">
+        <span id="bossName">LICHÁLD ÁRNYÉKA</span>
+        <div id="bossHpBar"></div>
+    </div>
+
+    <div id="xpBarContainer" style="display: none;"><div id="xpBar"></div></div>
+
+    <div id="ui" style="display: none;">
+        <div id="statsDisplay">Pálya: 1 | Ellenség: 0 / 0 | XP Érték: 0</div>
+        <div id="healthDisplay">Életerő: 100 / 100</div>
+        <div id="slotsDisplay">⚔️ 0/5 | 🛡️ 0/5</div>
+        <div id="buffsDisplay"></div>
+        <div id="hudControls">
+            <button class="hud-btn" onclick="adjustFov(0.1)">🔍 +</button>
+            <button class="hud-btn" onclick="adjustFov(-0.1)">🔍 -</button>
+            <button class="hud-btn" style="background-color: #8e44ad; border-color: #ffd700;" onclick="toggleMiniMapHUD()">🗺️ Térkép</button>
+        </div>
+    </div>
+
+    <div id="hudMinimapContainer" onclick="toggleMiniMapHUD()">
+        <canvas id="hudMinimapCanvas" width="200" height="200"></canvas>
+    </div>
+
+    <div id="divineOverlay"></div>
+
+    <div id="levelUpScreen" class="modal-screen">
+        <h1>SZINTLÉPÉS!</h1>
+        <p style="font-size: 18px; color: #ccc;">Válassz egy varázslatot vagy harci technikát a tudásod bővítéséhez:</p>
+        <div id="cardsContainer"></div>
+    </div>
+
+    <div id="gameOverScreen" class="modal-screen">
+        <h1>ELBUKTÁL</h1>
+        <p id="finalStats" style="font-size: 24px; margin-bottom: 20px; color: #f1c40f;"></p>
+        <button class="ui-btn" onclick="resetGame()">Újraéledés</button>
+        <button id="legendBtn" class="ui-btn" onclick="generateLegend()" style="margin-left: 15px;">✨ Írd meg a legendámat</button>
+        <div id="legendText"></div>
+    </div>
+
+    <div id="pauseMenu" class="modal-screen">
+        <h1>MEGÁLLÍTVA</h1>
+        <div class="zoom-control">
+            <label for="zoomSlider">Látótér mérete (Zoom): <span id="zoomValue">100%</span></label><br>
+            <input type="range" id="zoomSlider" min="100" max="200" step="10" value="100" oninput="updateZoom(this.value)">
+        </div>
+        <canvas id="minimapCanvas" width="400" height="400"></canvas>
+        <button class="ui-btn" onclick="togglePauseMenu()">Folytatás</button>
+    </div>
+
+    <div id="notificationBar"></div>
+
+    <!-- Játéktér -->
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- A Moduláris Játékmotor betöltése -->
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>
