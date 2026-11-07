@@ -385,6 +385,51 @@ function animate(timestamp) {
 }
 
 
+// Keep co-op end-of-run and restart events synchronized even while a client is on
+// the game-over screen (the regular animation loop is paused there).
+function applyMultiplayerRestart() {
+    state.currentStage = 1;
+    state.player = null;
+    state.score = 0;
+    state.pendingLevelUps = 0;
+    state.isPaused = false;
+    document.getElementById('gameOverScreen').style.display = 'none';
+    document.getElementById('ui').style.display = 'block';
+    document.getElementById('xpBarContainer').style.display = 'block';
+    initMultiplayerStage(1);
+}
+
+setInterval(() => {
+    if (!state.isMultiplayerMode || !state.localPlayerState || !window.Playroom) return;
+    try {
+        if (window.Playroom.getState("matchOver") === true && state.gameActive) UI.gameOver();
+
+        if (state.isHostUser) {
+            for (const key in state.remotePlayers) {
+                const guestObj = state.remotePlayers[key];
+                const request = guestObj.state.getState("restartRequest");
+                if (request && request.r_id !== guestObj.lastRestartRequestId) {
+                    guestObj.lastRestartRequestId = request.r_id;
+                    const event = { r_id: Math.random() };
+                    state.lastRestartEventId = event.r_id;
+                    window.Playroom.setState("matchOver", false);
+                    window.Playroom.setState("restartEvent", event);
+                    applyMultiplayerRestart();
+                    break;
+                }
+            }
+        }
+
+        const restartEvent = window.Playroom.getState("restartEvent");
+        if (restartEvent && restartEvent.r_id !== state.lastRestartEventId) {
+            state.lastRestartEventId = restartEvent.r_id;
+            applyMultiplayerRestart();
+        }
+    } catch (error) {
+        console.error("Co-op state synchronization failed:", error);
+    }
+}, 250);
+
 // --- HTML GOMBOK ÉS UI ÁLLAPOTOK KEZELÉSE ---
 window.startGame = () => { document.getElementById('startScreen').style.display = 'none'; document.getElementById('mainMenu').style.display = 'block'; };
 
