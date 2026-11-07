@@ -68,7 +68,13 @@ export function triggerLevelUp() {
 
     for (let i = available.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [available[i], available[j]] = [available[j], available[i]]; }
     const choices = available.slice(0, 4);
-    if (choices.length === 0) { state.player.health = state.player.maxHealth; state.isPaused = false; return; }
+    if (choices.length === 0) {
+        state.player.health = state.player.maxHealth;
+        state.pendingLevelUps = 0;
+        state.isPaused = false;
+        updateUI();
+        return;
+    }
 
     choices.forEach(choice => {
         const db = SPELL_DB[choice.id]; const card = document.createElement('div'); card.className = 'spell-card';
@@ -80,8 +86,14 @@ export function triggerLevelUp() {
 
 export function selectSpell(id) {
     const existing = state.player.spells.find(s => s.id === id);
-    if (existing) existing.level++; else state.player.spells.push({ id: id, level: 1, currentCd: 0 });
-    state.player.recalculateStats(); updateUI(); document.getElementById('levelUpScreen').style.display = 'none'; state.isPaused = false;
+    if (existing) existing.level++;
+    else state.player.spells.push({ id: id, level: 1, currentCd: 0 });
+    state.player.recalculateStats();
+    if (state.pendingLevelUps > 0) state.pendingLevelUps--;
+    updateUI();
+    document.getElementById('levelUpScreen').style.display = 'none';
+    if (state.pendingLevelUps > 0) triggerLevelUp();
+    else state.isPaused = false;
 }
 
 export function gameOver() { state.gameActive = false; document.getElementById('gameOverScreen').style.display = 'block'; document.getElementById('finalStats').innerText = `Elért Szint: ${state.player.level} | Összes felvett XP: ${state.score}`; }
