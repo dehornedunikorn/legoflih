@@ -100,7 +100,7 @@ export class Player {
                 tCtx.fillStyle = this.color; tCtx.beginPath(); tCtx.arc(16,16,10,0,Math.PI*2); tCtx.fill();
                 img.src = temp.toDataURL();
             };
-            img.src = `https://raw.githubusercontent.com/dehornedunikorn/legoflih/main/${baseName}${i}.png`;
+            img.src = `./assets/img/${baseName}${i}.png`;
             this.sprites.push(img);
         }
     }
