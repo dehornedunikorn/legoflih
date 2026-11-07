@@ -109,15 +109,18 @@ export class Player {
     addXP(amount) {
         const finalAmount = this.xpBoostTimer > 0 ? amount * 2 : amount;
         this.xp += Math.max(0, Number(finalAmount) || 0);
-        let didLevelUp = false;
+        let levelsEarned = 0;
         // Carry excess XP forward and account for every level earned in one pickup.
         while (this.xp >= this.maxXp) {
             this.xp -= this.maxXp;
             this.level++;
             this.maxXp = Math.floor(this.maxXp * 1.5);
-            didLevelUp = true;
+            levelsEarned++;
         }
-        if (didLevelUp) triggerLevelUp();
+        if (levelsEarned > 0) {
+            state.pendingLevelUps = (state.pendingLevelUps || 0) + levelsEarned;
+            if (!state.isPaused) triggerLevelUp();
+        }
         updateUI();
     }
 
