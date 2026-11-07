@@ -131,7 +131,7 @@ export function runMultiplayerSync(dtModifier) {
                         let dist = Math.hypot(e.x - guestHero.x, e.y - guestHero.y);
                         if (dist < 55) {
                             let angleToEnemy = Math.atan2(e.y - guestHero.y, e.x - guestHero.x);
-                            if (Math.abs(shootAction.angle - angleToEnemy) < Math.PI * 0.35) {
+                            if (Math.abs(Math.atan2(Math.sin(shootAction.angle - angleToEnemy), Math.cos(shootAction.angle - angleToEnemy))) < Math.PI * 0.35) {
                                 e.health -= dmg; e.x += Math.cos(angleToEnemy) * 25; e.y += Math.sin(angleToEnemy) * 25;
                                 createExplosion(e.x, e.y, '#e5e7e9', 6);
                             }
