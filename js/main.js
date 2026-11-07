@@ -87,7 +87,11 @@ export function initStage(stageNum) {
         state.player.loadClassSprites(state.selectedCharacterType); 
     } else { 
         state.player.x = WORLD_WIDTH / 2; state.player.y = WORLD_HEIGHT / 2; 
-        state.player.health = state.player.maxHealth; state.player.minions = []; state.player.recalculateStats(); 
+        state.player.health = state.player.maxHealth;
+        // Keep summoned spell companions when moving to the next stage.
+        // Re-center them with the player so they never get stranded at the previous portal.
+        state.player.minions.forEach(minion => { minion.x = state.player.x; minion.y = state.player.y; });
+        state.player.recalculateStats(); 
     }
     state.camera.x = state.player.x - canvas.width / 2; state.camera.y = state.player.y - canvas.height / 2;
     state.bullets = []; state.enemies = []; state.xpGems = []; state.particles = []; state.loots = []; state.damageNumbers = []; 
@@ -121,7 +125,11 @@ export function initMultiplayerStage(stageNum) {
         state.player.loadClassSprites(state.selectedCharacterType); 
     } else { 
         state.player.x = WORLD_WIDTH / 2; state.player.y = WORLD_HEIGHT / 2; 
-        state.player.health = state.player.maxHealth; state.player.minions = []; state.player.recalculateStats(); 
+        state.player.health = state.player.maxHealth;
+        // Keep summoned spell companions when moving to the next stage.
+        // Re-center them with the player so they never get stranded at the previous portal.
+        state.player.minions.forEach(minion => { minion.x = state.player.x; minion.y = state.player.y; });
+        state.player.recalculateStats(); 
     }
 
     state.camera.x = state.player.x - canvas.width / 2; state.camera.y = state.player.y - canvas.height / 2;
