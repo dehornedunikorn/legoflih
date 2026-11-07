@@ -78,19 +78,43 @@ export function gameOver() { state.gameActive = false; document.getElementById('
 export function resetGame() { state.currentStage = 1; state.player = null; initStage(state.currentStage); }
 
 export async function generateLegend() {
-    const btn = document.getElementById('legendBtn'); const textDiv = document.getElementById('legendText'); btn.disabled = true; btn.innerText = "✨ Krónikások körmölnek..."; textDiv.innerText = "";
-    const spellNames = state.player.spells.map(s => SPELL_DB[s.id].name).join(", ") || "csak puszta akaratereje";
-    
-    const prompt = `Írj egy nagyon rövid (maximum 3 mondatos), drámai, epikus fantasy lezárást egy hőstől, aki épp most halt hősi halált egy végtelen szörnyhorda ellen egy Crimsonland nevű vidéken. A hős legendájának adatai: Osztály: ${state.player.className === 'warrior' ? 'Lovag' : (state.player.className === 'ranger' ? 'Vándor' : 'Mágus')}, Elért szint: ${state.player.level}, XP: ${state.score}, Használt varázslatok: ${spellNames}. Magyar nyelven.`;
-    try { 
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
-        const payload = { contents: [{ parts: [{ text: prompt }] }] };
-        const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    const btn = document.getElementById('legendBtn');
+    const textDiv = document.getElementById('legendText');
+    if (!btn || !textDiv || !state.player) return;
+    btn.disabled = true;
+    btn.innerText = "✨ A krónikások dolgoznak...";
+    textDiv.innerText = "";
+    const spellNames = state.player.spells.map(s => SPELL_DB[s.id]?.name || s.id).join(", ") || "csak puszta akaratereje";
+    const className = state.player.className === 'warrior' ? 'Lovag' : (state.player.className === 'ranger' ? 'Vándor' : 'Mágus');
+    const prompt = `Írj maximum 3 mondatos, drámai fantasy lezárást egy hősről. Osztály: ${className}; szint: ${state.player.level}; XP: ${state.score}; képességek: ${spellNames}. Magyarul.`;
+
+    // No API key is committed to the public client repository. Provide a local
+    // ending instead of making a guaranteed failing request when no key exists.
+    if (!apiKey) {
+        textDiv.textContent = `"${className} ${state.player.level}. szintig jutott, és ${state.score} tapasztalatot gyűjtött. ${spellNames} erejével még a legsötétebb hordával is szembeszállt; neve legendává vált."`;
+        btn.innerText = "✨ A Legenda Megíratott";
+        return;
+    }
+
+    try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+        });
+        if (!response.ok) throw new Error(`Legend API returned HTTP ${response.status}`);
         const data = await response.json();
-        const legend = data.candidates[0].content.parts[0].text;
-        textDiv.innerHTML = `"${legend}"`; btn.innerText = "✨ A Legenda Megíratott"; 
-    } 
-    catch (error) { console.error(error); textDiv.innerText = "A krónikások tolla eltört..."; btn.disabled = false; btn.innerText = "✨ Próbáld újra"; }
+        const legend = data?.candidates?.[0]?.content?.parts?.map(part => part.text || '').join('').trim();
+        if (!legend) throw new Error("Empty legend response");
+        textDiv.textContent = `"${legend}"`;
+        btn.innerText = "✨ A Legenda Megíratott";
+    } catch (error) {
+        console.error("Legend generation failed:", error);
+        textDiv.innerText = "A krónikások ma nem érnek rá. Próbáld újra később.";
+        btn.disabled = false;
+        btn.innerText = "✨ Próbáld újra";
+    }
 }
 
 export function togglePauseMenu() {
