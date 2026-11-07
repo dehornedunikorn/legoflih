@@ -138,6 +138,7 @@ export class Player {
                 if(db.stat === 'thorns') this.thorns += (db.value * s.level);
                 if(db.stat === 'lifesteal') this.lifesteal += (db.value * s.level);
                 if(db.stat === 'low_hp_regen') this.lowHpRegen += (db.value * s.level);
+                if (s.id === 'forest_swiftness') this.evasion += 0.03 * s.level;
             }
         });
         if (this.armor > 0.8) this.armor = 0.8;
@@ -574,40 +575,64 @@ export class Minion {
     }
     update(dtModifier) {
         if (this.type === "fox") {
-            let closestGem = null; let minDist = 250; 
+            let closestGem = null;
+            let minGemDist = 250;
             state.xpGems.forEach(gem => {
-                let d = Math.hypot(gem.x - this.x, gem.y - this.y);
-                if (d < minDist) { minDist = d; closestGem = gem; }
+                const d = Math.hypot(gem.x - this.x, gem.y - this.y);
+                if (d < minGemDist) { minGemDist = d; closestGem = gem; }
             });
-            
+
             if (closestGem) {
                 const angle = Math.atan2(closestGem.y - this.y, closestGem.x - this.x);
-                this.x += Math.cos(angle) * this.speed * dtModifier; this.y += Math.sin(angle) * this.speed * dtModifier;
-                
-                if (Math.hypot(closestGem.x - this.x, closestGem.y - this.y) < this.radius + closestGem.radius) {
-                    if (!closestGem.collectedLocally) {
-                        closestGem.collectedLocally = true;
-                        if (state.isMultiplayerMode) {
-                            window.Playroom.myPlayer().setState("collectAction", { id: closestGem.id, type: "gem", r_id: Math.random() });
-                            if (!state.roomConfig.sharedProgression) {
-                                state.player.addXP(10); state.score += 10;
-                            } else if (state.isHostUser) {
-                                window.Playroom.setState("sharedXpEvent", { amount: 10, r_id: Math.random() });
-                            }
-                        } else {
-                            state.player.addXP(10); state.score += 10;
-                        }
-                        if (state.isHostUser || !state.isMultiplayerMode) {
-                            const idx = state.xpGems.indexOf(closestGem);
-                            if(idx !== -1) state.xpGems.splice(idx, 1);
-                        }
+                this.x += Math.cos(angle) * this.speed * dtModifier;
+                this.y += Math.sin(angle) * this.speed * dtModifier;
+                if (Math.hypot(closestGem.x - this.x, closestGem.y - this.y) < this.radius + closestGem.radius && !closestGem.collectedLocally) {
+                    closestGem.collectedLocally = true;
+                    if (state.isMultiplayerMode) {
+                        window.Playroom.myPlayer().setState("collectAction", { id: closestGem.id, type: "gem", r_id: Math.random() });
+                        if (!state.roomConfig.sharedProgression) { state.player.addXP(10); state.score += 10; }
+                        else if (state.isHostUser) window.Playroom.setState("sharedXpEvent", { amount: 10, r_id: Math.random() });
+                    } else {
+                        state.player.addXP(10);
+                        state.score += 10;
+                    }
+                    if (state.isHostUser || !state.isMultiplayerMode) {
+                        const idx = state.xpGems.indexOf(closestGem);
+                        if (idx !== -1) state.xpGems.splice(idx, 1);
+                    }
+                }
+                return;
+            }
+
+            // If no XP is nearby, fetch the closest unopened loot chest as promised
+            // by the ranger's companion description.
+            let closestLoot = null;
+            let minLootDist = 250;
+            state.loots.forEach(loot => {
+                if (loot.state !== 'idle') return;
+                const d = Math.hypot(loot.x - this.x, loot.y - this.y);
+                if (d < minLootDist) { minLootDist = d; closestLoot = loot; }
+            });
+            if (closestLoot) {
+                const angle = Math.atan2(closestLoot.y - this.y, closestLoot.x - this.x);
+                this.x += Math.cos(angle) * this.speed * dtModifier;
+                this.y += Math.sin(angle) * this.speed * dtModifier;
+                if (Math.hypot(closestLoot.x - this.x, closestLoot.y - this.y) < this.radius + closestLoot.radius) {
+                    if (state.isMultiplayerMode && !state.isHostUser) {
+                        window.Playroom.myPlayer().setState("collectAction", {
+                            id: closestLoot.id, type: "loot", lootType: closestLoot.type, r_id: Math.random()
+                        });
+                    } else {
+                        closestLoot.state = 'opening';
+                        createExplosion(closestLoot.x, closestLoot.y, closestLoot.color, 10);
                     }
                 }
             } else {
-                let dToPlayer = Math.hypot(state.player.x - this.x, state.player.y - this.y);
+                const dToPlayer = Math.hypot(state.player.x - this.x, state.player.y - this.y);
                 if (dToPlayer > 40) {
                     const angle = Math.atan2(state.player.y - this.y, state.player.x - this.x);
-                    this.x += Math.cos(angle) * this.speed * dtModifier; this.y += Math.sin(angle) * this.speed * dtModifier;
+                    this.x += Math.cos(angle) * this.speed * dtModifier;
+                    this.y += Math.sin(angle) * this.speed * dtModifier;
                 }
             }
             return;
