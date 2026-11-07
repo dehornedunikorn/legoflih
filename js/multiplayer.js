@@ -1,7 +1,7 @@
 import { PLAYROOM_GAME_ID, TARGET_FPS } from './config.js';
 import { state, input } from './state.js';
 import { Player, Enemy, XPGem, LootDrop, Bullet, createExplosion } from './entities.js';
-import { showNotification, openCharacterSelect, collectLoot, updateUI } from './ui.js';
+import { showNotification, openCharacterSelect, collectLoot, updateUI, gameOver } from './ui.js';
 
 export async function startMultiplayerCoop() {
     document.getElementById('mainMenu').style.display = 'none';
@@ -34,6 +34,9 @@ export async function startMultiplayerCore(roomCodeToJoin) {
         await window.Playroom.insertCoin(initOptions);
         state.localPlayerState = window.Playroom.myPlayer();
         state.isHostUser = window.Playroom.isHost();
+        state.multiplayerMatchLaunched = false;
+        state.lastDamageEventId = null;
+        if (state.isHostUser) window.Playroom.setState("matchLaunched", false);
 
         if (state.isHostUser) {
             document.getElementById('displayRoomCode').innerText = window.Playroom.getRoomCode();
@@ -81,13 +84,27 @@ export async function startMultiplayerCore(roomCodeToJoin) {
 export function confirmHostConfig() {
     state.roomConfig.uniqueClasses = document.getElementById('configUniqueClasses').value === 'true';
     state.roomConfig.sharedProgression = document.getElementById('configSharedProgression').value === 'true';
-    window.Playroom.setState("config", state.roomConfig); window.Playroom.setState("gameStarted", true);
+    state.multiplayerMatchLaunched = false;
+    window.Playroom.setState("config", state.roomConfig);
+    window.Playroom.setState("matchLaunched", false);
+    window.Playroom.setState("gameStarted", true);
     document.getElementById('hostConfigScreen').style.display = 'none'; openCharacterSelect('multi');
 }
 
 export function runMultiplayerSync(dtModifier) {
     if (!state.isMultiplayerMode) return;
-    if (!state.localPlayerState || !state.player) return; 
+    if (!state.localPlayerState || !state.player) return;
+
+    // Damage events are written by the host into this client's player state.
+    const damageAction = state.localPlayerState.getState("damageAction");
+    if (damageAction && damageAction.r_id !== state.lastDamageEventId) {
+        state.lastDamageEventId = damageAction.r_id;
+        const amount = Math.max(0, Number(damageAction.amount) || 0);
+        state.player.health = Math.max(0, state.player.health - amount);
+        state.localPlayerState.setState("health", state.player.health);
+        updateUI();
+        if (state.player.health <= 0) gameOver();
+    }
 
     const aim = input.isTouchDevice && input.touchAim.active ? input.touchAim : input.mouse;
     const targetX = aim.x * state.fovMultiplier + state.camera.x;
@@ -172,6 +189,11 @@ export function runMultiplayerSync(dtModifier) {
 
             const serializedLoots = state.loots.map(l => ({ id: l.id, x: Math.round(l.x), y: Math.round(l.y), type: l.type, state: l.state, timer: Math.round(l.animationTimer) }));
             window.Playroom.setState("loots", serializedLoots);
+            const serializedEnemyBullets = state.bullets.filter(b => b.isEnemy).map(b => ({
+                id: b.id, x: Math.round(b.x), y: Math.round(b.y),
+                vx: b.vx, vy: b.vy, damage: b.damage, color: b.color, radius: b.radius
+            }));
+            window.Playroom.setState("enemyBullets", serializedEnemyBullets);
         }
 
         if (state.enemies.length === 0 && !state.gate.open) {
@@ -205,6 +227,24 @@ export function runMultiplayerSync(dtModifier) {
                 let local = state.loots.find(l => l.id === hl.id);
                 if (local) { local.x = hl.x; local.y = hl.y; local.state = hl.state; local.animationTimer = hl.timer; } 
                 else { let newL = new LootDrop(hl.x, hl.y, hl.type, hl.id); newL.state = hl.state; newL.animationTimer = hl.timer; state.loots.push(newL); }
+            });
+        }
+
+        const hEnemyBullets = window.Playroom.getState("enemyBullets");
+        if (Array.isArray(hEnemyBullets)) {
+            const activeIds = new Set(hEnemyBullets.map(b => b.id));
+            state.bullets = state.bullets.filter(b => !b.isEnemy || activeIds.has(b.id));
+            hEnemyBullets.forEach(data => {
+                let local = state.bullets.find(b => b.isEnemy && b.id === data.id);
+                if (!local) {
+                    local = new Bullet(data.x, data.y, data.vx, data.vy, data.damage, data.color, true);
+                    local.id = data.id;
+                    local.radius = data.radius || 5;
+                    state.bullets.push(local);
+                } else {
+                    local.x = data.x; local.y = data.y;
+                    local.vx = data.vx; local.vy = data.vy;
+                }
             });
         }
 
