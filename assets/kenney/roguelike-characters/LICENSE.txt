@@ -1,0 +1,7 @@
+Kenney Roguelike Characters
+Creator: Kenney
+License: CC0 1.0 Universal
+https://creativecommons.org/publicdomain/zero/1.0/
+
+The original asset pack is dedicated to the public domain under CC0 1.0.
+Source: https://kenney.nl/assets/roguelike-characters
