@@ -492,6 +492,7 @@ export class Enemy {
             }
         }
     }
+}
 
 export class XPGem {
     constructor(x, y, customId = null) { 
