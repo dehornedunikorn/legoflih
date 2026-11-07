@@ -487,7 +487,7 @@ export class Enemy {
 
         if (this.isBoss && state.frameCount % 120 === 0) {
             for (let a = 0; a < Math.PI * 2; a += Math.PI / 4) {
-                state.bullets.push(new Bullet(this.x, this.y, Math.cos(a) * 5, Math.sin(a) * 5, 15, '#ff0055'));
+                state.bullets.push(new Bullet(this.x, this.y, Math.cos(a) * 5, Math.sin(a) * 5, 15, '#ff0055', true));
             }
         }
     }
