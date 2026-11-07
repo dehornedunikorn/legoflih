@@ -134,6 +134,10 @@ export function selectSpell(id) {
 }
 
 export function gameOver() {
+    if (!state.gameActive) return;
+    if (state.isMultiplayerMode && state.isHostUser && window.Playroom) {
+        try { window.Playroom.setState("matchOver", true); } catch (error) { console.warn("Could not sync co-op defeat:", error); }
+    }
     state.gameActive = false;
     document.getElementById('gameOverScreen').style.display = 'block';
     document.getElementById('finalStats').innerText = `Elért Szint: ${state.player.level} | Összes felvett XP: ${state.score}`;
@@ -151,10 +155,28 @@ export function resetGame() {
     document.getElementById('gameOverScreen').style.display = 'none';
     document.getElementById('ui').style.display = 'block';
     document.getElementById('xpBarContainer').style.display = 'block';
-    if (state.isMultiplayerMode) initMultiplayerStage(state.currentStage);
-    else initStage(state.currentStage);
-}
 
+    if (state.isMultiplayerMode) {
+        if (!state.localPlayerState || !window.Playroom) {
+            showNotification("A hálózati kapcsolat megszakadt. Csatlakozz újra a szobához.");
+            return;
+        }
+        if (!state.isHostUser) {
+            state.localPlayerState.setState("restartRequest", { r_id: Math.random() });
+            document.getElementById('gameOverScreen').style.display = 'block';
+            showNotification("Újraindítási kérés elküldve a házigazdának.");
+            return;
+        }
+        const event = { r_id: Math.random() };
+        state.lastRestartEventId = event.r_id;
+        state.multiplayerMatchLaunched = true;
+        window.Playroom.setState("matchOver", false);
+        window.Playroom.setState("restartEvent", event);
+        initMultiplayerStage(state.currentStage);
+    } else {
+        initStage(state.currentStage);
+    }
+}
 export async function generateLegend() {
     const btn = document.getElementById('legendBtn');
     const textDiv = document.getElementById('legendText');
