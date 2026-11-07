@@ -12,9 +12,10 @@ export function showNotification(msg) {
 
 export function updateUI() {
     const get = id => document.getElementById(id);
-    const enemyCount = state.isMultiplayerMode && window.Playroom
-        ? (window.Playroom.getState("enemiesCount") || 0)
-        : state.enemies.length;
+    let enemyCount = state.enemies.length;
+    if (state.isMultiplayerMode && window.Playroom) {
+        try { enemyCount = window.Playroom.getState("enemiesCount") || 0; } catch (_) { /* Lobby not initialized yet. */ }
+    }
     const stats = get('statsDisplay');
     if (stats) stats.innerText = `Pálya: ${state.currentStage} | Ellenség: ${enemyCount} / ${state.totalEnemiesInStage} | XP Érték: ${state.score}`;
     if (!state.player) return;
@@ -40,7 +41,7 @@ export function updateUI() {
 
 export function collectLoot(type) {
     const overlay = document.getElementById('divineOverlay'); overlay.innerText = `Megszerezted: ${LOOT_TYPES[type].name}!`; overlay.style.opacity = 1;
-    setTimeout(() => { overlay.style.opacity = 0; }, 2500);
+    if (overlay) setTimeout(() => { overlay.style.opacity = 0; }, 2500);
 
     if (type === 'potion') {
         const herbalism = state.player.spells.find(spell => spell.id === 'herbalism');
@@ -106,6 +107,7 @@ export function resetGame() {
     state.currentStage = 1;
     state.player = null;
     state.score = 0;
+    state.pendingLevelUps = 0;
     state.isPaused = false;
     document.getElementById('gameOverScreen').style.display = 'none';
     document.getElementById('ui').style.display = 'block';
