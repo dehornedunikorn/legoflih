@@ -36,7 +36,12 @@ export async function startMultiplayerCore(roomCodeToJoin) {
         state.isHostUser = window.Playroom.isHost();
         state.multiplayerMatchLaunched = false;
         state.lastDamageEventId = null;
-        if (state.isHostUser) window.Playroom.setState("matchLaunched", false);
+        state.lastRestartEventId = 0;
+        if (state.isHostUser) {
+            window.Playroom.setState("matchLaunched", false);
+            window.Playroom.setState("matchOver", false);
+            window.Playroom.setState("restartEvent", { r_id: 0 });
+        }
 
         if (state.isHostUser) {
             document.getElementById('displayRoomCode').innerText = window.Playroom.getRoomCode();
