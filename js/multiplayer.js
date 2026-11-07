@@ -32,6 +32,7 @@ export async function startMultiplayerCore(roomCodeToJoin) {
         if (roomCodeToJoin) { initOptions.roomCode = roomCodeToJoin; }
 
         await window.Playroom.insertCoin(initOptions);
+        state.localPlayerState = window.Playroom.myPlayer();
         state.isHostUser = window.Playroom.isHost();
 
         if (state.isHostUser) {
