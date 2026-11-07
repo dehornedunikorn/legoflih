@@ -85,7 +85,17 @@ export function selectSpell(id) {
 }
 
 export function gameOver() { state.gameActive = false; document.getElementById('gameOverScreen').style.display = 'block'; document.getElementById('finalStats').innerText = `Elért Szint: ${state.player.level} | Összes felvett XP: ${state.score}`; }
-export function resetGame() { state.currentStage = 1; state.player = null; initStage(state.currentStage); }
+export function resetGame() {
+    state.currentStage = 1;
+    state.player = null;
+    state.score = 0;
+    state.isPaused = false;
+    document.getElementById('gameOverScreen').style.display = 'none';
+    document.getElementById('ui').style.display = 'block';
+    document.getElementById('xpBarContainer').style.display = 'block';
+    if (state.isMultiplayerMode) initMultiplayerStage(state.currentStage);
+    else initStage(state.currentStage);
+}
 
 export async function generateLegend() {
     const btn = document.getElementById('legendBtn');
