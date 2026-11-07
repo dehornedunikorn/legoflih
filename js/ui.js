@@ -42,7 +42,12 @@ export function collectLoot(type) {
     const overlay = document.getElementById('divineOverlay'); overlay.innerText = `Megszerezted: ${LOOT_TYPES[type].name}!`; overlay.style.opacity = 1;
     setTimeout(() => { overlay.style.opacity = 0; }, 2500);
 
-    if (type === 'potion') { state.player.health = Math.min(state.player.maxHealth, state.player.health + (state.player.maxHealth * 0.25)); createExplosion(state.player.x, state.player.y, '#ff2a2a', 25); } 
+    if (type === 'potion') {
+        const herbalism = state.player.spells.find(spell => spell.id === 'herbalism');
+        const bonus = herbalism ? herbalism.level * 0.1 : 0;
+        state.player.health = Math.min(state.player.maxHealth, state.player.health + (state.player.maxHealth * 0.25 * (1 + bonus)));
+        createExplosion(state.player.x, state.player.y, '#ff2a2a', 25);
+    }
     else if (type === 'magnet') { state.xpGems.forEach(gem => gem.magnetized = true); createExplosion(state.player.x, state.player.y, '#00ffff', 30); } 
     else if (type === 'grenade') { 
         const canvas = document.getElementById('gameCanvas');
