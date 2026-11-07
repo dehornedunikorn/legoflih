@@ -435,7 +435,6 @@ window.confirmCharacterSelection = () => {
         initStage(state.currentStage);
     }
 };
-};
 
 // --- MULTIPLAYER LOBBY UI FRISSÍTÉSE CIKLUS ---
 setInterval(() => {
