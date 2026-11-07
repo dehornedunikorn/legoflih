@@ -11,20 +11,30 @@ export function showNotification(msg) {
 }
 
 export function updateUI() {
-    let enemyCount = state.isMultiplayerMode ? window.Playroom.getState("enemiesCount") || 0 : state.enemies.length;
-    document.getElementById('statsDisplay').innerText = `Pálya: ${state.currentStage} | Ellenség: ${enemyCount} / ${state.totalEnemiesInStage} | XP Érték: ${state.score}`;
-    document.getElementById('healthDisplay').innerText = `Életerő: ${Math.floor(state.player.health)} / ${state.player.maxHealth}`;
-    document.getElementById('slotsDisplay').innerText = `⚔️ ${state.player.getActiveSpellCount()}/5  |  🛡️ ${state.player.getPassiveSpellCount()}/5`;
-    document.getElementById('xpBar').style.width = `${(state.player.xp / state.player.maxXp) * 100}%`;
-    
-    let buffTexts = [];
+    const get = id => document.getElementById(id);
+    const enemyCount = state.isMultiplayerMode && window.Playroom
+        ? (window.Playroom.getState("enemiesCount") || 0)
+        : state.enemies.length;
+    const stats = get('statsDisplay');
+    if (stats) stats.innerText = `Pálya: ${state.currentStage} | Ellenség: ${enemyCount} / ${state.totalEnemiesInStage} | XP Érték: ${state.score}`;
+    if (!state.player) return;
+
+    const health = get('healthDisplay');
+    if (health) health.innerText = `Életerő: ${Math.floor(state.player.health)} / ${state.player.maxHealth}`;
+    const slots = get('slotsDisplay');
+    if (slots) slots.innerText = `⚔️ ${state.player.getActiveSpellCount()}/5  |  🛡️ ${state.player.getPassiveSpellCount()}/5`;
+    const xpBar = get('xpBar');
+    if (xpBar) xpBar.style.width = `${(state.player.xp / state.player.maxXp) * 100}%`;
+
+    const buffTexts = [];
     if (state.player.xpBoostTimer > 0) buffTexts.push(`⚡ XP x2 (${Math.ceil(state.player.xpBoostTimer / 60)}mp)`);
     if (state.player.dmgBoostTimer > 0) buffTexts.push(`🔥 Sebzés x2 (${Math.ceil(state.player.dmgBoostTimer / 60)}mp)`);
-    document.getElementById('buffsDisplay').innerText = buffTexts.join(' | ');
+    const buffs = get('buffsDisplay');
+    if (buffs) buffs.innerText = buffTexts.join(' | ');
 
     if (state.activeBoss) {
-        let bossHpPercent = Math.max(0, (state.activeBoss.health / state.activeBoss.maxHealth) * 100);
-        document.getElementById('bossHpBar').style.width = `${bossHpPercent}%`;
+        const bossBar = get('bossHpBar');
+        if (bossBar) bossBar.style.width = `${Math.max(0, (state.activeBoss.health / state.activeBoss.maxHealth) * 100)}%`;
     }
 }
 
