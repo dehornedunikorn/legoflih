@@ -414,16 +414,27 @@ window.selectCharacter = (type) => {
 window.backToMainMenu = UI.backToMainMenu;
 
 window.confirmCharacterSelection = () => {
-    if (state.charSelectMode === 'multi') {
-        const currentReady = state.localPlayerState.getState("gameReady");
-        state.localPlayerState.setState("gameReady", !currentReady); // Átkapcsolás gomb (Kész/Mégse)
-    } else {
-        if (!state.selectedCharacterType) return; 
-        document.getElementById('charSelectScreen').style.display = 'none'; 
-        document.getElementById('ui').style.display = 'block'; 
-        document.getElementById('xpBarContainer').style.display = 'block';
-        state.currentStage = 1; state.player = null; initStage(state.currentStage); 
+    if (!state.selectedCharacterType) {
+        document.getElementById('charSelectWarning').innerText = "Előbb válassz egy hőst!";
+        return;
     }
+    if (state.charSelectMode === 'multi') {
+        if (!state.localPlayerState) {
+            document.getElementById('charSelectWarning').innerText = "A hálózati kapcsolat még inicializálódik. Próbáld újra!";
+            return;
+        }
+        const currentReady = state.localPlayerState.getState("gameReady");
+        state.localPlayerState.setState("class", state.selectedCharacterType);
+        state.localPlayerState.setState("gameReady", !currentReady);
+    } else {
+        document.getElementById('charSelectScreen').style.display = 'none';
+        document.getElementById('ui').style.display = 'block';
+        document.getElementById('xpBarContainer').style.display = 'block';
+        state.currentStage = 1;
+        state.player = null;
+        initStage(state.currentStage);
+    }
+};
 };
 
 // --- MULTIPLAYER LOBBY UI FRISSÍTÉSE CIKLUS ---
