@@ -194,6 +194,19 @@ function animate(timestamp) {
 
     runMultiplayerSync(dtModifier);
 
+    // Keep the boss bar synchronized on guests as well as the host.
+    if (state.currentStage % 5 === 0) {
+        const boss = state.enemies.find(enemy => enemy.isBoss) || (state.activeBoss && state.activeBoss.health > 0 ? state.activeBoss : null);
+        const bossContainer = document.getElementById('bossHpContainer');
+        const bossBar = document.getElementById('bossHpBar');
+        if (boss) {
+            bossContainer.style.display = 'block';
+            bossBar.style.width = `${Math.max(0, boss.health / boss.maxHealth * 100)}%`;
+        } else if (state.gate.open) {
+            bossContainer.style.display = 'none';
+        }
+    }
+
     ctx.save(); ctx.scale(1 / state.fovMultiplier, 1 / state.fovMultiplier); ctx.translate(-state.camera.x, -state.camera.y);
 
     ctx.save(); ctx.shadowBlur = state.gate.open ? 30 : 5; ctx.shadowColor = state.gate.open ? '#00ffff' : '#555';
