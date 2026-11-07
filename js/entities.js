@@ -311,7 +311,7 @@ export class Player {
                 }
                 else if (spell.id === 'blizzard') {
                     state.enemies.forEach(e => {
-                        if (Math.hypot(e.x - this.x, e.y - this.y) < 100) { e.health -= actualDmg; e.speed = e.baseSpeed * 0.5; if(Math.random()<0.1) createExplosion(e.x, e.y, '#aaddff', 1); }
+                        if (Math.hypot(e.x - this.x, e.y - this.y) < 100) { e.health -= actualDmg; e.slowTimer = Math.max(e.slowTimer || 0, 45); if(Math.random()<0.1) createExplosion(e.x, e.y, '#aaddff', 1); }
                     });
                     spell.currentCd = 10;
                 }
@@ -328,6 +328,41 @@ export class Player {
                 else if (spell.id === 'whirlwind') {
                     state.enemies.forEach(e => { if (Math.hypot(e.x - this.x, e.y - this.y) < 70) { e.health -= actualDmg; createExplosion(e.x, e.y, '#ccd1d1', 2); } });
                     spell.currentCd = Math.max(20, (db.baseCooldown + db.cdScale * spell.level) * this.cooldownMulti);
+                }
+                else if (spell.id === 'shield_charge') {
+                    let closest = null;
+                    let minDist = 260;
+                    state.enemies.forEach(e => {
+                        const d = Math.hypot(e.x - this.x, e.y - this.y);
+                        if (d < minDist) { minDist = d; closest = e; }
+                    });
+                    let angle;
+                    if (closest) angle = Math.atan2(closest.y - this.y, closest.x - this.x);
+                    else {
+                        const aim = input.isTouchDevice && input.touchAim.active ? input.touchAim : input.mouse;
+                        angle = Math.atan2(aim.y * state.fovMultiplier + state.camera.y - this.y, aim.x * state.fovMultiplier + state.camera.x - this.x);
+                    }
+                    this.x = Math.max(this.radius, Math.min(WORLD_WIDTH - this.radius, this.x + Math.cos(angle) * 115));
+                    this.y = Math.max(this.radius, Math.min(WORLD_HEIGHT - this.radius, this.y + Math.sin(angle) * 115));
+                    this.slashActive = true; this.slashAngle = angle; this.slashTimer = 0;
+                    state.enemies.forEach(e => {
+                        if (Math.hypot(e.x - this.x, e.y - this.y) < 65) {
+                            e.health -= actualDmg;
+                            e.slowTimer = Math.max(e.slowTimer || 0, 30);
+                            createExplosion(e.x, e.y, '#f1c40f', 5);
+                        }
+                    });
+                    spell.currentCd = Math.max(30, (db.baseCooldown + db.cdScale * spell.level) * this.cooldownMulti);
+                }
+                else if (spell.id === 'ground_slam') {
+                    createExplosion(this.x, this.y, '#c49a55', 28);
+                    state.enemies.forEach(e => {
+                        if (Math.hypot(e.x - this.x, e.y - this.y) < 145) {
+                            e.health -= actualDmg;
+                            e.slowTimer = Math.max(e.slowTimer || 0, 90);
+                        }
+                    });
+                    spell.currentCd = Math.max(30, (db.baseCooldown + db.cdScale * spell.level) * this.cooldownMulti);
                 }
                 else if (spell.id === 'skeleton' || spell.id === 'wolf' || spell.id === 'ranger_wolf') {
                     const maxCount = Math.floor(db.baseCount + db.countScale * spell.level);
