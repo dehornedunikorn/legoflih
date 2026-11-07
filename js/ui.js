@@ -40,67 +40,13 @@ export function updateUI() {
 }
 
 export function collectLoot(type) {
-    const overlay = document.getElementById('divineOverlay'); overlay.innerText = `Megszerezted: ${LOOT_TYPES[type].name}!`; overlay.style.opacity = 1;
-    if (overlay) setTimeout(() => { overlay.style.opacity = 0; }, 2500);
-
-    if (type === 'potion') {
-        const herbalism = state.player.spells.find(spell => spell.id === 'herbalism');
-        const bonus = herbalism ? herbalism.level * 0.1 : 0;
-        state.player.health = Math.min(state.player.maxHealth, state.player.health + (state.player.maxHealth * 0.25 * (1 + bonus)));
-        createExplosion(state.player.x, state.player.y, '#ff2a2a', 25);
+    if (!state.player || !LOOT_TYPES[type]) return;
+    const overlay = document.getElementById('divineOverlay');
+    if (overlay) {
+        overlay.innerText = `Megszerezted: ${LOOT_TYPES[type].name}!`;
+        overlay.style.opacity = 1;
+        setTimeout(() => { overlay.style.opacity = 0; }, 2500);
     }
-    else if (type === 'magnet') { state.xpGems.forEach(gem => gem.magnetized = true); createExplosion(state.player.x, state.player.y, '#00ffff', 30); } 
-    else if (type === 'grenade') { 
-        const canvas = document.getElementById('gameCanvas');
-        let viewW = canvas.width * state.fovMultiplier; let viewH = canvas.height * state.fovMultiplier; 
-        createExplosion(state.player.x, state.player.y, '#ffffaa', 60); 
-        state.enemies.forEach(e => { if (e.x > state.camera.x && e.x < state.camera.x + viewW && e.y > state.camera.y && e.y < state.camera.y + viewH) { e.health = 0; } }); 
-    } 
-    else if (type === 'xp_boost') { state.player.xpBoostTimer = 60 * 60; } 
-    else if (type === 'dmg_boost') { state.player.dmgBoostTimer = 60 * 60; state.player.recalculateStats(); }
-    updateUI();
-}
-
-export function triggerLevelUp() {
-    state.isPaused = true; const container = document.getElementById('cardsContainer'); container.innerHTML = '';
-    let available = []; const activeCount = state.player.getActiveSpellCount(); const passiveCount = state.player.getPassiveSpellCount();
-
-    for (let key in SPELL_DB) {
-        const dbInfo = SPELL_DB[key]; if (dbInfo.class !== state.player.className) continue;
-        const owned = state.player.spells.find(s => s.id === key);
-        if (owned) { if (owned.level < 10) available.push({ id: key, isUpgrade: true, nextLevel: owned.level + 1 }); } 
-        else { if (dbInfo.type === 'active' && activeCount < 5) available.push({ id: key, isUpgrade: false, nextLevel: 1 }); if (dbInfo.type === 'passive' && passiveCount < 5) available.push({ id: key, isUpgrade: false, nextLevel: 1 }); }
-    }
-
-    for (let i = available.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [available[i], available[j]] = [available[j], available[i]]; }
-    const choices = available.slice(0, 4);
-    if (choices.length === 0) {
-        state.player.health = state.player.maxHealth;
-        state.pendingLevelUps = 0;
-        state.isPaused = false;
-        updateUI();
-        return;
-    }
-
-    choices.forEach(choice => {
-        const db = SPELL_DB[choice.id]; const card = document.createElement('div'); card.className = 'spell-card';
-        card.innerHTML = `<div><div class="spell-title">${db.name}</div><div class="spell-type">${db.category} | ${choice.isUpgrade ? 'Fejlesztés' : 'Új'}</div><div class="spell-desc">${db.desc(choice.nextLevel)}</div></div><div class="spell-level">Szint: ${choice.nextLevel} / 10</div>`;
-        card.onclick = () => { selectSpell(choice.id); }; container.appendChild(card);
-    });
-    document.getElementById('levelUpScreen').style.display = 'block';
-}
-
-export function selectSpell(id) {
-    const existing = state.player.spells.find(s => s.id === id);
-    if (existing) existing.level++;
-    else state.player.spells.push({ id: id, level: 1, currentCd: 0 });
-    state.player.recalculateStats();
-    if (state.pendingLevelUps > 0) state.pendingLevelUps--;
-    updateUI();
-    document.getElementById('levelUpScreen').style.display = 'none';
-    if (state.pendingLevelUps > 0) triggerLevelUp();
-    else state.isPaused = false;
-}
 
 export function gameOver() { state.gameActive = false; document.getElementById('gameOverScreen').style.display = 'block'; document.getElementById('finalStats').innerText = `Elért Szint: ${state.player.level} | Összes felvett XP: ${state.score}`; }
 export function resetGame() {
