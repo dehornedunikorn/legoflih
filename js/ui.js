@@ -133,7 +133,15 @@ export function selectSpell(id) {
     else state.isPaused = false;
 }
 
-export function gameOver() { state.gameActive = false; document.getElementById('gameOverScreen').style.display = 'block'; document.getElementById('finalStats').innerText = `Elért Szint: ${state.player.level} | Összes felvett XP: ${state.score}`; }
+export function gameOver() {
+    state.gameActive = false;
+    document.getElementById('gameOverScreen').style.display = 'block';
+    document.getElementById('finalStats').innerText = `Elért Szint: ${state.player.level} | Összes felvett XP: ${state.score}`;
+    const legendBtn = document.getElementById('legendBtn');
+    if (legendBtn) { legendBtn.disabled = false; legendBtn.innerText = "✨ Írd meg a legendámat"; }
+    const legendText = document.getElementById('legendText');
+    if (legendText) legendText.innerText = "";
+}
 export function resetGame() {
     state.currentStage = 1;
     state.player = null;
