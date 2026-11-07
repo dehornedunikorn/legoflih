@@ -66,7 +66,13 @@ export async function startMultiplayerCore(roomCodeToJoin) {
 
     } catch (err) {
         console.error("Playroom hiba: ", err);
-        if (roomCodeToJoin) { showNotification("Hibás szobakód, vagy a szoba már nem létezik!"); document.getElementById('mainMenu').style.display = 'block'; } 
+        if (roomCodeToJoin) {
+            state.isMultiplayerMode = false;
+            state.localPlayerState = null;
+            state.remotePlayers = {};
+            showNotification("Hibás szobakód, vagy a szoba már nem létezik!");
+            document.getElementById('joinMenuScreen').style.display = 'block';
+        } 
         else { showNotification("Sikertelen hálózati kapcsolat. Single Player mód betöltése..."); state.isMultiplayerMode = false; openCharacterSelect('single'); }
     }
 }
