@@ -275,3 +275,35 @@ select {
     pointer-events: none;
     z-index: 100;
 }
+
+/* Responsive layouts for narrow phones and touch devices */
+@media (max-width: 600px) {
+    .modal-screen {
+        width: 96%;
+        max-height: 94vh;
+        padding: 20px 14px;
+    }
+    h1 { font-size: clamp(24px, 7vw, 34px); letter-spacing: 1px; }
+    #gameTitleMain { font-size: clamp(30px, 9vw, 46px); letter-spacing: 2px; }
+    .menu-grid { width: 100%; }
+    .menu-grid .ui-btn,
+    .modal-screen .ui-btn {
+        min-width: 0 !important;
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
+        font-size: 16px !important;
+        padding: 12px 10px;
+    }
+    .cards-grid { gap: 10px; }
+    .char-card { min-width: 125px; padding: 12px 8px; }
+    .char-icon { font-size: 36px; }
+    .form-row { flex-wrap: wrap; gap: 8px; }
+    #statsDisplay, #healthDisplay { font-size: 14px; }
+    #slotsDisplay, #buffsDisplay { font-size: 12px; }
+    #hudControls { top: 8px; right: 8px; gap: 5px; }
+    .hud-btn { padding: 7px 9px; font-size: 12px; }
+    #hudMinimapContainer { top: 58px; right: 8px; }
+    #hudMinimapCanvas { width: 140px; height: 140px; }
+    #notificationBar { bottom: 12px; width: 88%; padding: 10px 12px; font-size: 13px; }
+}
