@@ -107,12 +107,17 @@ export class Player {
     getPassiveSpellCount() { return this.spells.filter(s => SPELL_DB[s.id].type === 'passive').length; }
 
     addXP(amount) {
-        let finalAmount = this.xpBoostTimer > 0 ? amount * 2 : amount;
-        this.xp += finalAmount;
-        if (this.xp >= this.maxXp) {
-            this.xp -= this.maxXp; this.level++; this.maxXp = Math.floor(this.maxXp * 1.5);
-            triggerLevelUp();
+        const finalAmount = this.xpBoostTimer > 0 ? amount * 2 : amount;
+        this.xp += Math.max(0, Number(finalAmount) || 0);
+        let didLevelUp = false;
+        // Carry excess XP forward and account for every level earned in one pickup.
+        while (this.xp >= this.maxXp) {
+            this.xp -= this.maxXp;
+            this.level++;
+            this.maxXp = Math.floor(this.maxXp * 1.5);
+            didLevelUp = true;
         }
+        if (didLevelUp) triggerLevelUp();
         updateUI();
     }
 
