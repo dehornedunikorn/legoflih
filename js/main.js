@@ -194,6 +194,19 @@ function animate(timestamp) {
 
     runMultiplayerSync(dtModifier);
 
+    // Keep the boss bar synchronized on guests as well as the host.
+    if (state.currentStage % 5 === 0) {
+        const boss = state.enemies.find(enemy => enemy.isBoss) || (state.activeBoss && state.activeBoss.health > 0 ? state.activeBoss : null);
+        const bossContainer = document.getElementById('bossHpContainer');
+        const bossBar = document.getElementById('bossHpBar');
+        if (boss) {
+            bossContainer.style.display = 'block';
+            bossBar.style.width = `${Math.max(0, boss.health / boss.maxHealth * 100)}%`;
+        } else if (state.gate.open) {
+            bossContainer.style.display = 'none';
+        }
+    }
+
     ctx.save(); ctx.scale(1 / state.fovMultiplier, 1 / state.fovMultiplier); ctx.translate(-state.camera.x, -state.camera.y);
 
     ctx.save(); ctx.shadowBlur = state.gate.open ? 30 : 5; ctx.shadowColor = state.gate.open ? '#00ffff' : '#555';
@@ -270,23 +283,27 @@ function animate(timestamp) {
     }
 
     for (let i = state.bullets.length - 1; i >= 0; i--) {
-        const b = state.bullets[i]; b.update(dtModifier); b.draw(ctx);
-        if (b.x < state.camera.x - 200 || b.x > state.camera.x + viewW + 200 || b.y < state.camera.y - 200 || b.y > state.camera.y + viewH + 200) { state.bullets.splice(i, 1); continue; }
+        const b = state.bullets[i];
+        b.update(dtModifier);
+        b.draw(ctx);
+        if (b.isEnemy && Math.hypot(b.x - state.player.x, b.y - state.player.y) < b.radius + state.player.radius) {
+            const damage = Math.max(1, b.damage * (1 - state.player.armor));
+            state.player.health -= damage;
+            state.damageNumbers.push(new FloatingDamage(state.player.x, state.player.y - 15, `${Math.ceil(damage)}`, '#ff3333'));
+            state.bullets.splice(i, 1);
+            UI.updateUI();
+            if (state.player.health <= 0) UI.gameOver();
+            continue;
+        }
+        if (b.x < state.camera.x - 200 || b.x > state.camera.x + viewW + 200 ||
+            b.y < state.camera.y - 200 || b.y > state.camera.y + viewH + 200) {
+            state.bullets.splice(i, 1);
+        }
     }
 
     if (!state.isMultiplayerMode || state.isHostUser) {
-        let spawnRate = Math.max(30, 120 - Math.floor(state.player.level * 3)); 
-        if (state.frameCount % spawnRate === 0) {
-            let isVertical = Math.random() < 0.5; let x, y;
-            if (isVertical) { x = Math.random() < 0.5 ? state.camera.x - 50 : state.camera.x + viewW + 50; y = state.camera.y + Math.random() * viewH; } 
-            else { x = state.camera.x + Math.random() * viewW; y = Math.random() < 0.5 ? state.camera.y - 50 : state.camera.y + viewH + 50; }
-            x = Math.max(0, Math.min(WORLD_WIDTH, x)); y = Math.max(0, Math.min(WORLD_HEIGHT, y));
-            let availableTypes = ['slime'];
-            if (state.player.level >= 2) availableTypes.push('bat'); if (state.player.level >= 4) availableTypes.push('wolf'); if (state.player.level >= 6) availableTypes.push('skeleton');
-            let type = availableTypes[Math.floor(Math.random() * availableTypes.length)];
-            state.enemies.push(new Enemy(x, y, type));
-        }
-
+        // Each stage has a fixed enemy count. Do not spawn replacements here:
+        // continuous spawning prevented the arena from ever being cleared.
         for (let i = state.enemies.length - 1; i >= 0; i--) {
             const enemy = state.enemies[i]; enemy.update(dtModifier); 
             if (enemy.x > state.camera.x - 50 && enemy.x < state.camera.x + viewW + 50 && enemy.y > state.camera.y - 50 && enemy.y < state.camera.y + viewH + 50) { enemy.draw(ctx); }
@@ -314,6 +331,7 @@ function animate(timestamp) {
 
             for (let j = state.bullets.length - 1; j >= 0; j--) {
                 const b = state.bullets[j];
+                if (b.isEnemy) continue;
                 if (Math.hypot(b.x - enemy.x, b.y - enemy.y) < enemy.radius + b.radius) {
                     enemy.health -= b.damage; state.damageNumbers.push(new FloatingDamage(enemy.x, enemy.y - 15, `${Math.floor(b.damage)}`, '#00ffff'));
                     state.bullets.splice(j, 1); createExplosion(b.x, b.y, b.color, 5); break;
@@ -414,15 +432,25 @@ window.selectCharacter = (type) => {
 window.backToMainMenu = UI.backToMainMenu;
 
 window.confirmCharacterSelection = () => {
+    if (!state.selectedCharacterType) {
+        document.getElementById('charSelectWarning').innerText = "Előbb válassz egy hőst!";
+        return;
+    }
     if (state.charSelectMode === 'multi') {
+        if (!state.localPlayerState) {
+            document.getElementById('charSelectWarning').innerText = "A hálózati kapcsolat még inicializálódik. Próbáld újra!";
+            return;
+        }
         const currentReady = state.localPlayerState.getState("gameReady");
-        state.localPlayerState.setState("gameReady", !currentReady); // Átkapcsolás gomb (Kész/Mégse)
+        state.localPlayerState.setState("class", state.selectedCharacterType);
+        state.localPlayerState.setState("gameReady", !currentReady);
     } else {
-        if (!state.selectedCharacterType) return; 
-        document.getElementById('charSelectScreen').style.display = 'none'; 
-        document.getElementById('ui').style.display = 'block'; 
+        document.getElementById('charSelectScreen').style.display = 'none';
+        document.getElementById('ui').style.display = 'block';
         document.getElementById('xpBarContainer').style.display = 'block';
-        state.currentStage = 1; state.player = null; initStage(state.currentStage); 
+        state.currentStage = 1;
+        state.player = null;
+        initStage(state.currentStage);
     }
 };
 

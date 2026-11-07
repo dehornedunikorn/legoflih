@@ -10,6 +10,7 @@ export const state = {
     gameActive: false,
     isPaused: false,
     score: 0,
+    pendingLevelUps: 0,
     frameCount: 0,
     
     lastSharedXpTs: 0,

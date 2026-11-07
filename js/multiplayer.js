@@ -32,6 +32,7 @@ export async function startMultiplayerCore(roomCodeToJoin) {
         if (roomCodeToJoin) { initOptions.roomCode = roomCodeToJoin; }
 
         await window.Playroom.insertCoin(initOptions);
+        state.localPlayerState = window.Playroom.myPlayer();
         state.isHostUser = window.Playroom.isHost();
 
         if (state.isHostUser) {
@@ -66,7 +67,13 @@ export async function startMultiplayerCore(roomCodeToJoin) {
 
     } catch (err) {
         console.error("Playroom hiba: ", err);
-        if (roomCodeToJoin) { showNotification("Hibás szobakód, vagy a szoba már nem létezik!"); document.getElementById('mainMenu').style.display = 'block'; } 
+        if (roomCodeToJoin) {
+            state.isMultiplayerMode = false;
+            state.localPlayerState = null;
+            state.remotePlayers = {};
+            showNotification("Hibás szobakód, vagy a szoba már nem létezik!");
+            document.getElementById('joinMenuScreen').style.display = 'block';
+        } 
         else { showNotification("Sikertelen hálózati kapcsolat. Single Player mód betöltése..."); state.isMultiplayerMode = false; openCharacterSelect('single'); }
     }
 }
@@ -82,23 +89,29 @@ export function runMultiplayerSync(dtModifier) {
     if (!state.isMultiplayerMode) return;
     if (!state.localPlayerState || !state.player) return; 
 
+    const aim = input.isTouchDevice && input.touchAim.active ? input.touchAim : input.mouse;
+    const targetX = aim.x * state.fovMultiplier + state.camera.x;
+    const targetY = aim.y * state.fovMultiplier + state.camera.y;
+    const aimAngle = Math.atan2(targetY - state.player.y, targetX - state.player.x);
+
     state.localPlayerState.setState("pos", { x: Math.round(state.player.x), y: Math.round(state.player.y) });
-    state.localPlayerState.setState("angle", Math.atan2(input.mouse.y - state.player.y, input.mouse.x - state.player.x));
+    state.localPlayerState.setState("angle", aimAngle);
     state.localPlayerState.setState("health", state.player.health);
     state.localPlayerState.setState("level", state.player.level);
     state.localPlayerState.setState("score", state.score);
 
-    if (input.mouse.down && state.player.shootCooldown <= 0) {
+    // Touch aim and mouse fire share the same network event.
+    if ((input.mouse.down || (input.isTouchDevice && input.touchAim.active)) && state.player.shootCooldown <= 0) {
         let dmg = 25 * state.player.damageMulti;
-        if(state.player.className === 'warrior') dmg = 40 * state.player.damageMulti;
-        if(state.player.className === 'ranger') dmg = 20 * state.player.damageMulti;
-
+        if (state.player.className === 'warrior') dmg = 40 * state.player.damageMulti;
+        if (state.player.className === 'ranger') dmg = 20 * state.player.damageMulti;
         state.localPlayerState.setState("shootAction", {
-            x: Math.round(state.player.x), y: Math.round(state.player.y), angle: Math.atan2(input.mouse.y - state.player.y, input.mouse.x - state.player.x), damage: dmg, r_id: Math.random() 
+            x: Math.round(state.player.x), y: Math.round(state.player.y),
+            angle: aimAngle, damage: dmg, r_id: Math.random()
         });
     }
 
-    for (let key in state.remotePlayers) {
+        for (let key in state.remotePlayers) {
         const guestObj = state.remotePlayers[key]; const guestState = guestObj.state; const guestHero = guestObj.hero;
         const pos = guestState.getState("pos"); const angle = guestState.getState("angle"); const hp = guestState.getState("health"); const pClass = guestState.getState("class");
 
@@ -119,7 +132,7 @@ export function runMultiplayerSync(dtModifier) {
                         let dist = Math.hypot(e.x - guestHero.x, e.y - guestHero.y);
                         if (dist < 55) {
                             let angleToEnemy = Math.atan2(e.y - guestHero.y, e.x - guestHero.x);
-                            if (Math.abs(shootAction.angle - angleToEnemy) < Math.PI * 0.35) {
+                            if (Math.abs(Math.atan2(Math.sin(shootAction.angle - angleToEnemy), Math.cos(shootAction.angle - angleToEnemy))) < Math.PI * 0.35) {
                                 e.health -= dmg; e.x += Math.cos(angleToEnemy) * 25; e.y += Math.sin(angleToEnemy) * 25;
                                 createExplosion(e.x, e.y, '#e5e7e9', 6);
                             }

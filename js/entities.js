@@ -107,11 +107,19 @@ export class Player {
     getPassiveSpellCount() { return this.spells.filter(s => SPELL_DB[s.id].type === 'passive').length; }
 
     addXP(amount) {
-        let finalAmount = this.xpBoostTimer > 0 ? amount * 2 : amount;
-        this.xp += finalAmount;
-        if (this.xp >= this.maxXp) {
-            this.xp -= this.maxXp; this.level++; this.maxXp = Math.floor(this.maxXp * 1.5);
-            triggerLevelUp();
+        const finalAmount = this.xpBoostTimer > 0 ? amount * 2 : amount;
+        this.xp += Math.max(0, Number(finalAmount) || 0);
+        let levelsEarned = 0;
+        // Carry excess XP forward and account for every level earned in one pickup.
+        while (this.xp >= this.maxXp) {
+            this.xp -= this.maxXp;
+            this.level++;
+            this.maxXp = Math.floor(this.maxXp * 1.5);
+            levelsEarned++;
+        }
+        if (levelsEarned > 0) {
+            state.pendingLevelUps = (state.pendingLevelUps || 0) + levelsEarned;
+            if (!state.isPaused) triggerLevelUp();
         }
         updateUI();
     }
@@ -133,6 +141,7 @@ export class Player {
                 if(db.stat === 'thorns') this.thorns += (db.value * s.level);
                 if(db.stat === 'lifesteal') this.lifesteal += (db.value * s.level);
                 if(db.stat === 'low_hp_regen') this.lowHpRegen += (db.value * s.level);
+                if (s.id === 'forest_swiftness') this.evasion += 0.03 * s.level;
             }
         });
         if (this.armor > 0.8) this.armor = 0.8;
@@ -306,7 +315,7 @@ export class Player {
                 }
                 else if (spell.id === 'blizzard') {
                     state.enemies.forEach(e => {
-                        if (Math.hypot(e.x - this.x, e.y - this.y) < 100) { e.health -= actualDmg; e.speed = e.baseSpeed * 0.5; if(Math.random()<0.1) createExplosion(e.x, e.y, '#aaddff', 1); }
+                        if (Math.hypot(e.x - this.x, e.y - this.y) < 100) { e.health -= actualDmg; e.slowTimer = Math.max(e.slowTimer || 0, 45); if(Math.random()<0.1) createExplosion(e.x, e.y, '#aaddff', 1); }
                     });
                     spell.currentCd = 10;
                 }
@@ -323,6 +332,41 @@ export class Player {
                 else if (spell.id === 'whirlwind') {
                     state.enemies.forEach(e => { if (Math.hypot(e.x - this.x, e.y - this.y) < 70) { e.health -= actualDmg; createExplosion(e.x, e.y, '#ccd1d1', 2); } });
                     spell.currentCd = Math.max(20, (db.baseCooldown + db.cdScale * spell.level) * this.cooldownMulti);
+                }
+                else if (spell.id === 'shield_charge') {
+                    let closest = null;
+                    let minDist = 260;
+                    state.enemies.forEach(e => {
+                        const d = Math.hypot(e.x - this.x, e.y - this.y);
+                        if (d < minDist) { minDist = d; closest = e; }
+                    });
+                    let angle;
+                    if (closest) angle = Math.atan2(closest.y - this.y, closest.x - this.x);
+                    else {
+                        const aim = input.isTouchDevice && input.touchAim.active ? input.touchAim : input.mouse;
+                        angle = Math.atan2(aim.y * state.fovMultiplier + state.camera.y - this.y, aim.x * state.fovMultiplier + state.camera.x - this.x);
+                    }
+                    this.x = Math.max(this.radius, Math.min(WORLD_WIDTH - this.radius, this.x + Math.cos(angle) * 115));
+                    this.y = Math.max(this.radius, Math.min(WORLD_HEIGHT - this.radius, this.y + Math.sin(angle) * 115));
+                    this.slashActive = true; this.slashAngle = angle; this.slashTimer = 0;
+                    state.enemies.forEach(e => {
+                        if (Math.hypot(e.x - this.x, e.y - this.y) < 65) {
+                            e.health -= actualDmg;
+                            e.slowTimer = Math.max(e.slowTimer || 0, 30);
+                            createExplosion(e.x, e.y, '#f1c40f', 5);
+                        }
+                    });
+                    spell.currentCd = Math.max(30, (db.baseCooldown + db.cdScale * spell.level) * this.cooldownMulti);
+                }
+                else if (spell.id === 'ground_slam') {
+                    createExplosion(this.x, this.y, '#c49a55', 28);
+                    state.enemies.forEach(e => {
+                        if (Math.hypot(e.x - this.x, e.y - this.y) < 145) {
+                            e.health -= actualDmg;
+                            e.slowTimer = Math.max(e.slowTimer || 0, 90);
+                        }
+                    });
+                    spell.currentCd = Math.max(30, (db.baseCooldown + db.cdScale * spell.level) * this.cooldownMulti);
                 }
                 else if (spell.id === 'skeleton' || spell.id === 'wolf' || spell.id === 'ranger_wolf') {
                     const maxCount = Math.floor(db.baseCount + db.countScale * spell.level);
@@ -381,6 +425,7 @@ export class Enemy {
             this.maxHealth = 60 + (levelScale * 15); this.damage = 30 + (levelScale * 5);
         }
         this.speed = this.baseSpeed; this.health = this.maxHealth;
+        this.slowTimer = 0;
     }
 
     draw(ctx) {
@@ -417,35 +462,35 @@ export class Enemy {
         ctx.restore();
     }
 
-    update(dtModifier) { 
+    update(dtModifier) {
+        this.slowTimer = Math.max(0, (this.slowTimer || 0) - dtModifier);
+        this.speed = this.baseSpeed * (this.slowTimer > 0 ? 0.5 : 1);
         if (state.isMultiplayerMode && !state.isHostUser) {
             this.x += (this.targetX - this.x) * 0.15 * dtModifier;
             this.y += (this.targetY - this.y) * 0.15 * dtModifier;
         } else {
-            let targetX = state.player.x; let targetY = state.player.y;
+            let targetX = state.player.x;
+            let targetY = state.player.y;
             let minDist = Math.hypot(targetX - this.x, targetY - this.y);
-
             if (state.isMultiplayerMode) {
                 for (let key in state.remotePlayers) {
                     const guest = state.remotePlayers[key].hero;
+                    if (!guest) continue;
                     const dist = Math.hypot(guest.x - this.x, guest.y - this.y);
                     if (dist < minDist) { minDist = dist; targetX = guest.x; targetY = guest.y; }
                 }
             }
-            
-            const angle = Math.atan2(targetY - this.y, targetX - this.x); 
-            this.x += Math.cos(angle) * this.speed * dtModifier; 
-            this.y += Math.sin(angle) * this.speed * dtModifier; 
+            const angle = Math.atan2(targetY - this.y, targetX - this.x);
+            this.x += Math.cos(angle) * this.speed * dtModifier;
+            this.y += Math.sin(angle) * this.speed * dtModifier;
         }
-        this.speed = this.baseSpeed; 
 
         if (this.isBoss && state.frameCount % 120 === 0) {
-            for(let a=0; a<Math.PI*2; a += Math.PI/4) {
-                state.bullets.push(new Bullet(this.x, this.y, Math.cos(a)*5, Math.sin(a)*5, 15, '#ff0055'));
+            for (let a = 0; a < Math.PI * 2; a += Math.PI / 4) {
+                state.bullets.push(new Bullet(this.x, this.y, Math.cos(a) * 5, Math.sin(a) * 5, 15, '#ff0055', true));
             }
         }
     }
-}
 
 export class XPGem {
     constructor(x, y, customId = null) { 
@@ -534,40 +579,64 @@ export class Minion {
     }
     update(dtModifier) {
         if (this.type === "fox") {
-            let closestGem = null; let minDist = 250; 
+            let closestGem = null;
+            let minGemDist = 250;
             state.xpGems.forEach(gem => {
-                let d = Math.hypot(gem.x - this.x, gem.y - this.y);
-                if (d < minDist) { minDist = d; closestGem = gem; }
+                const d = Math.hypot(gem.x - this.x, gem.y - this.y);
+                if (d < minGemDist) { minGemDist = d; closestGem = gem; }
             });
-            
+
             if (closestGem) {
                 const angle = Math.atan2(closestGem.y - this.y, closestGem.x - this.x);
-                this.x += Math.cos(angle) * this.speed * dtModifier; this.y += Math.sin(angle) * this.speed * dtModifier;
-                
-                if (Math.hypot(closestGem.x - this.x, closestGem.y - this.y) < this.radius + closestGem.radius) {
-                    if (!closestGem.collectedLocally) {
-                        closestGem.collectedLocally = true;
-                        if (state.isMultiplayerMode) {
-                            window.Playroom.myPlayer().setState("collectAction", { id: closestGem.id, type: "gem", r_id: Math.random() });
-                            if (!state.roomConfig.sharedProgression) {
-                                state.player.addXP(10); state.score += 10;
-                            } else if (state.isHostUser) {
-                                window.Playroom.setState("sharedXpEvent", { amount: 10, r_id: Math.random() });
-                            }
-                        } else {
-                            state.player.addXP(10); state.score += 10;
-                        }
-                        if (state.isHostUser || !state.isMultiplayerMode) {
-                            const idx = state.xpGems.indexOf(closestGem);
-                            if(idx !== -1) state.xpGems.splice(idx, 1);
-                        }
+                this.x += Math.cos(angle) * this.speed * dtModifier;
+                this.y += Math.sin(angle) * this.speed * dtModifier;
+                if (Math.hypot(closestGem.x - this.x, closestGem.y - this.y) < this.radius + closestGem.radius && !closestGem.collectedLocally) {
+                    closestGem.collectedLocally = true;
+                    if (state.isMultiplayerMode) {
+                        window.Playroom.myPlayer().setState("collectAction", { id: closestGem.id, type: "gem", r_id: Math.random() });
+                        if (!state.roomConfig.sharedProgression) { state.player.addXP(10); state.score += 10; }
+                        else if (state.isHostUser) window.Playroom.setState("sharedXpEvent", { amount: 10, r_id: Math.random() });
+                    } else {
+                        state.player.addXP(10);
+                        state.score += 10;
+                    }
+                    if (state.isHostUser || !state.isMultiplayerMode) {
+                        const idx = state.xpGems.indexOf(closestGem);
+                        if (idx !== -1) state.xpGems.splice(idx, 1);
+                    }
+                }
+                return;
+            }
+
+            // If no XP is nearby, fetch the closest unopened loot chest as promised
+            // by the ranger's companion description.
+            let closestLoot = null;
+            let minLootDist = 250;
+            state.loots.forEach(loot => {
+                if (loot.state !== 'idle') return;
+                const d = Math.hypot(loot.x - this.x, loot.y - this.y);
+                if (d < minLootDist) { minLootDist = d; closestLoot = loot; }
+            });
+            if (closestLoot) {
+                const angle = Math.atan2(closestLoot.y - this.y, closestLoot.x - this.x);
+                this.x += Math.cos(angle) * this.speed * dtModifier;
+                this.y += Math.sin(angle) * this.speed * dtModifier;
+                if (Math.hypot(closestLoot.x - this.x, closestLoot.y - this.y) < this.radius + closestLoot.radius) {
+                    if (state.isMultiplayerMode && !state.isHostUser) {
+                        window.Playroom.myPlayer().setState("collectAction", {
+                            id: closestLoot.id, type: "loot", lootType: closestLoot.type, r_id: Math.random()
+                        });
+                    } else {
+                        closestLoot.state = 'opening';
+                        createExplosion(closestLoot.x, closestLoot.y, closestLoot.color, 10);
                     }
                 }
             } else {
-                let dToPlayer = Math.hypot(state.player.x - this.x, state.player.y - this.y);
+                const dToPlayer = Math.hypot(state.player.x - this.x, state.player.y - this.y);
                 if (dToPlayer > 40) {
                     const angle = Math.atan2(state.player.y - this.y, state.player.x - this.x);
-                    this.x += Math.cos(angle) * this.speed * dtModifier; this.y += Math.sin(angle) * this.speed * dtModifier;
+                    this.x += Math.cos(angle) * this.speed * dtModifier;
+                    this.y += Math.sin(angle) * this.speed * dtModifier;
                 }
             }
             return;
