@@ -270,8 +270,22 @@ function animate(timestamp) {
     }
 
     for (let i = state.bullets.length - 1; i >= 0; i--) {
-        const b = state.bullets[i]; b.update(dtModifier); b.draw(ctx);
-        if (b.x < state.camera.x - 200 || b.x > state.camera.x + viewW + 200 || b.y < state.camera.y - 200 || b.y > state.camera.y + viewH + 200) { state.bullets.splice(i, 1); continue; }
+        const b = state.bullets[i];
+        b.update(dtModifier);
+        b.draw(ctx);
+        if (b.isEnemy && Math.hypot(b.x - state.player.x, b.y - state.player.y) < b.radius + state.player.radius) {
+            const damage = Math.max(1, b.damage * (1 - state.player.armor));
+            state.player.health -= damage;
+            state.damageNumbers.push(new FloatingDamage(state.player.x, state.player.y - 15, `${Math.ceil(damage)}`, '#ff3333'));
+            state.bullets.splice(i, 1);
+            UI.updateUI();
+            if (state.player.health <= 0) UI.gameOver();
+            continue;
+        }
+        if (b.x < state.camera.x - 200 || b.x > state.camera.x + viewW + 200 ||
+            b.y < state.camera.y - 200 || b.y > state.camera.y + viewH + 200) {
+            state.bullets.splice(i, 1);
+        }
     }
 
     if (!state.isMultiplayerMode || state.isHostUser) {
@@ -304,6 +318,7 @@ function animate(timestamp) {
 
             for (let j = state.bullets.length - 1; j >= 0; j--) {
                 const b = state.bullets[j];
+                if (b.isEnemy) continue;
                 if (Math.hypot(b.x - enemy.x, b.y - enemy.y) < enemy.radius + b.radius) {
                     enemy.health -= b.damage; state.damageNumbers.push(new FloatingDamage(enemy.x, enemy.y - 15, `${Math.floor(b.damage)}`, '#00ffff'));
                     state.bullets.splice(j, 1); createExplosion(b.x, b.y, b.color, 5); break;
