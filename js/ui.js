@@ -135,6 +135,9 @@ export function selectSpell(id) {
 
 export function gameOver() {
     if (!state.gameActive) return;
+    if (state.isMultiplayerMode && state.localPlayerState) {
+        try { state.localPlayerState.setState("health", 0); } catch (error) { console.warn("Could not sync player defeat:", error); }
+    }
     if (state.isMultiplayerMode && state.isHostUser && window.Playroom) {
         try { window.Playroom.setState("matchOver", true); } catch (error) { console.warn("Could not sync co-op defeat:", error); }
     }
