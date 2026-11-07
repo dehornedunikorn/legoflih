@@ -2,7 +2,7 @@ name: Validate browser game JavaScript
 
 on:
   push:
-    branches: [main, fix/stability-gameplay]
+    branches: ['**']
   pull_request:
     branches: [main]
 

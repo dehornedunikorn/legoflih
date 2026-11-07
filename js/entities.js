@@ -34,6 +34,7 @@ export class Bullet {
         this.x = x; this.y = y; this.vx = vx; this.vy = vy;
         this.damage = damage; this.color = color; this.radius = 5;
         this.isEnemy = isEnemy;
+        this.id = `bullet_${Math.random().toString(36).slice(2, 11)}`;
     }
     draw(ctx) { 
         ctx.save();
@@ -99,7 +100,7 @@ export class Player {
                 tCtx.fillStyle = this.color; tCtx.beginPath(); tCtx.arc(16,16,10,0,Math.PI*2); tCtx.fill();
                 img.src = temp.toDataURL();
             };
-            img.src = `https://raw.githubusercontent.com/dehornedunikorn/legoflih/main/${baseName}${i}.png`;
+            img.src = `./assets/img/${baseName}${i}.png`;
             this.sprites.push(img);
         }
     }
@@ -476,7 +477,7 @@ export class Enemy {
             if (state.isMultiplayerMode) {
                 for (let key in state.remotePlayers) {
                     const guest = state.remotePlayers[key].hero;
-                    if (!guest) continue;
+                    if (!guest || guest.health <= 0) continue;
                     const dist = Math.hypot(guest.x - this.x, guest.y - this.y);
                     if (dist < minDist) { minDist = dist; targetX = guest.x; targetY = guest.y; }
                 }
@@ -492,6 +493,7 @@ export class Enemy {
             }
         }
     }
+}
 
 export class XPGem {
     constructor(x, y, customId = null) { 

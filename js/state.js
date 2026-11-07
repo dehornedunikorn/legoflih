@@ -29,6 +29,9 @@ export const state = {
     localPlayerState: null,
     remotePlayers: {},
     isHostUser: false,
+    multiplayerMatchLaunched: false,
+    lastDamageEventId: null,
+    lastRestartEventId: null,
     roomConfig: {
         uniqueClasses: true,
         sharedProgression: true

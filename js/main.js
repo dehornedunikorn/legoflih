@@ -322,10 +322,18 @@ function animate(timestamp) {
                 }
             }
 
-            if (state.isMultiplayerMode) {
+            if (state.isMultiplayerMode && state.isHostUser) {
                 for (let key in state.remotePlayers) {
-                    const guest = state.remotePlayers[key].hero; const dToGuest = Math.hypot(guest.x - enemy.x, guest.y - enemy.y);
-                    if (dToGuest < guest.radius + enemy.radius) { if(state.frameCount % 10 === 0) createExplosion(guest.x, guest.y, '#e74c3c', 1); }
+                    const guestObj = state.remotePlayers[key];
+                    const guest = guestObj.hero;
+                    if (!guest || guest.health <= 0) continue;
+                    const dToGuest = Math.hypot(guest.x - enemy.x, guest.y - enemy.y);
+                    // Host-authoritative, rate-limited damage for remote players.
+                    if (dToGuest < guest.radius + enemy.radius && state.frameCount % 30 === 0) {
+                        const amount = Math.max(1, enemy.damage * 0.05);
+                        guestObj.state.setState("damageAction", { amount, r_id: Math.random() });
+                        createExplosion(guest.x, guest.y, '#e74c3c', 2);
+                    }
                 }
             }
 
@@ -376,6 +384,51 @@ function animate(timestamp) {
     state.frameCount++;
 }
 
+
+// Keep co-op end-of-run and restart events synchronized even while a client is on
+// the game-over screen (the regular animation loop is paused there).
+function applyMultiplayerRestart() {
+    state.currentStage = 1;
+    state.player = null;
+    state.score = 0;
+    state.pendingLevelUps = 0;
+    state.isPaused = false;
+    document.getElementById('gameOverScreen').style.display = 'none';
+    document.getElementById('ui').style.display = 'block';
+    document.getElementById('xpBarContainer').style.display = 'block';
+    initMultiplayerStage(1);
+}
+
+setInterval(() => {
+    if (!state.isMultiplayerMode || !state.localPlayerState || !window.Playroom) return;
+    try {
+        if (window.Playroom.getState("matchOver") === true && state.gameActive) UI.gameOver();
+
+        if (state.isHostUser) {
+            for (const key in state.remotePlayers) {
+                const guestObj = state.remotePlayers[key];
+                const request = guestObj.state.getState("restartRequest");
+                if (request && request.r_id !== guestObj.lastRestartRequestId) {
+                    guestObj.lastRestartRequestId = request.r_id;
+                    const event = { r_id: Math.random() };
+                    state.lastRestartEventId = event.r_id;
+                    window.Playroom.setState("matchOver", false);
+                    window.Playroom.setState("restartEvent", event);
+                    applyMultiplayerRestart();
+                    break;
+                }
+            }
+        }
+
+        const restartEvent = window.Playroom.getState("restartEvent");
+        if (restartEvent && restartEvent.r_id !== state.lastRestartEventId) {
+            state.lastRestartEventId = restartEvent.r_id;
+            applyMultiplayerRestart();
+        }
+    } catch (error) {
+        console.error("Co-op state synchronization failed:", error);
+    }
+}, 250);
 
 // --- HTML GOMBOK ÉS UI ÁLLAPOTOK KEZELÉSE ---
 window.startGame = () => { document.getElementById('startScreen').style.display = 'none'; document.getElementById('mainMenu').style.display = 'block'; };
@@ -454,71 +507,61 @@ window.confirmCharacterSelection = () => {
     }
 };
 
-// --- MULTIPLAYER LOBBY UI FRISSÍTÉSE CIKLUS ---
+// --- MULTIPLAYER LOBBY UI FRISSÍTÉSE ÉS HOST-AUTORITATÍV INDÍTÁS ---
 setInterval(() => {
     const charScreen = document.getElementById('charSelectScreen');
-    if (charScreen.style.display !== 'none' && state.charSelectMode === 'multi') {
-        const listEl = document.getElementById('lobbyPlayerList');
-        if (!listEl) return;
-        
-        let allReady = true;
-        let playersCount = 0;
-        let html = "";
-        
-        const classNames = { wizard: 'Varázsló', warrior: 'Harcos', ranger: 'Vándor' };
-        
-        // 1. A mi karakterünk listázása
-        if (state.localPlayerState) {
-            playersCount++;
-            const isReady = state.localPlayerState.getState("gameReady");
-            const rawClass = state.localPlayerState.getState("class");
-            const pClass = classNames[rawClass] || "Kiválasztás alatt...";
-            const name = state.localPlayerState.getProfile().name;
-            const color = state.localPlayerState.getProfile().color.hex;
-            
-            if (!isReady) allReady = false;
-            
-            html += `<li style="margin-bottom: 12px; padding: 10px; background: rgba(0,0,0,0.4); border-radius: 6px; border-left: 5px solid ${color};">
-                <strong style="font-size:18px;">${name} (Te)</strong><br>
-                <span style="font-size:14px; color:#aaa;">Kaszt: <span style="color:#fff">${pClass}</span></span><br>
-                <span style="font-size:16px; font-weight:bold; color:${isReady ? '#2ecc71' : '#e74c3c'}">${isReady ? '✔ Készen áll' : '❌ Nem áll készen'}</span>
-            </li>`;
-            
+    if (!charScreen || charScreen.style.display === 'none' || state.charSelectMode !== 'multi' || !state.localPlayerState || !window.Playroom) return;
+    const listEl = document.getElementById('lobbyPlayerList');
+    if (!listEl) return;
+
+    let allReady = true;
+    let playersCount = 0;
+    let html = "";
+    const classNames = { wizard: 'Varázsló', warrior: 'Harcos', ranger: 'Vándor' };
+    const appendPlayer = (playerState, isLocal) => {
+        playersCount++;
+        const isReady = playerState.getState("gameReady") === true;
+        const rawClass = playerState.getState("class");
+        const pClass = classNames[rawClass] || "Kiválasztás alatt...";
+        const profile = playerState.getProfile();
+        const name = profile?.name || (isLocal ? "Te" : "Játékos");
+        const color = profile?.color?.hex || "#8e44ad";
+        if (!isReady) allReady = false;
+        html += `<li style="margin-bottom:12px;padding:10px;background:rgba(0,0,0,.4);border-radius:6px;border-left:5px solid ${color}">
+            <strong style="font-size:18px;">${name}${isLocal ? ' (Te)' : ''}</strong><br>
+            <span style="font-size:14px;color:#aaa;">Kaszt: <span style="color:#fff">${pClass}</span></span><br>
+            <span style="font-size:16px;font-weight:bold;color:${isReady ? '#2ecc71' : '#e74c3c'}">${isReady ? '✔ Készen áll' : '❌ Várakozás...'}</span>
+        </li>`;
+        if (isLocal) {
             const btn = document.getElementById('charStartBtn');
-            if (btn) {
-                btn.innerText = isReady ? "Visszavonás / Not Ready" : "Készen állok! / Ready!";
-            }
+            if (btn) btn.innerText = isReady ? "Visszavonás / Not Ready" : "Készen állok! / Ready!";
         }
-        
-        // 2. Többi csatlakozott játékos listázása
-        for (let key in state.remotePlayers) {
-            playersCount++;
-            const guestObj = state.remotePlayers[key];
-            const isReady = guestObj.state.getState("gameReady");
-            const rawClass = guestObj.state.getState("class");
-            const pClass = classNames[rawClass] || "Kiválasztás alatt...";
-            const name = guestObj.state.getProfile().name;
-            const color = guestObj.state.getProfile().color.hex;
-            
-            if (!isReady) allReady = false;
-            
-            html += `<li style="margin-bottom: 12px; padding: 10px; background: rgba(0,0,0,0.4); border-radius: 6px; border-left: 5px solid ${color};">
-                <strong style="font-size:18px;">${name}</strong><br>
-                <span style="font-size:14px; color:#aaa;">Kaszt: <span style="color:#fff">${pClass}</span></span><br>
-                <span style="font-size:16px; font-weight:bold; color:${isReady ? '#2ecc71' : '#e74c3c'}">${isReady ? '✔ Készen áll' : '❌ Várakozás...'}</span>
-            </li>`;
+    };
+
+    appendPlayer(state.localPlayerState, true);
+    for (const key in state.remotePlayers) {
+        const guestState = state.remotePlayers[key]?.state;
+        if (guestState) appendPlayer(guestState, false);
+    }
+    listEl.innerHTML = html;
+
+    try {
+        // The host alone publishes the launch decision; guests wait for it.
+        if (state.isHostUser && allReady && playersCount > 0 && !state.multiplayerMatchLaunched) {
+            state.multiplayerMatchLaunched = true;
+            window.Playroom.setState("matchLaunched", true);
         }
-        
-        listEl.innerHTML = html;
-        
-        // 3. JÁTÉK INDÍTÁSA HA MINDENKI KÉSZ
-        if (allReady && playersCount > 0 && state.localPlayerState) {
-            state.localPlayerState.setState("gameReady", false); // Visszaállítjuk, ha vége lenne a menetnek
-            document.getElementById('charSelectScreen').style.display = 'none'; 
-            document.getElementById('ui').style.display = 'block'; 
+        const launched = window.Playroom.getState("matchLaunched") === true;
+        if (launched && !state.multiplayerMatchLaunched) state.multiplayerMatchLaunched = true;
+        if (launched && state.multiplayerMatchLaunched) {
+            charScreen.style.display = 'none';
+            document.getElementById('ui').style.display = 'block';
             document.getElementById('xpBarContainer').style.display = 'block';
             initMultiplayerStage(1);
         }
+    } catch (error) {
+        console.error("Multiplayer lobby synchronization failed:", error);
+        UI.showNotification("A lobby szinkronizálása megszakadt. Próbálj újra csatlakozni.");
     }
 }, 500);
 
