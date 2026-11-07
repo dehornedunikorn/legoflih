@@ -275,18 +275,8 @@ function animate(timestamp) {
     }
 
     if (!state.isMultiplayerMode || state.isHostUser) {
-        let spawnRate = Math.max(30, 120 - Math.floor(state.player.level * 3)); 
-        if (state.frameCount % spawnRate === 0) {
-            let isVertical = Math.random() < 0.5; let x, y;
-            if (isVertical) { x = Math.random() < 0.5 ? state.camera.x - 50 : state.camera.x + viewW + 50; y = state.camera.y + Math.random() * viewH; } 
-            else { x = state.camera.x + Math.random() * viewW; y = Math.random() < 0.5 ? state.camera.y - 50 : state.camera.y + viewH + 50; }
-            x = Math.max(0, Math.min(WORLD_WIDTH, x)); y = Math.max(0, Math.min(WORLD_HEIGHT, y));
-            let availableTypes = ['slime'];
-            if (state.player.level >= 2) availableTypes.push('bat'); if (state.player.level >= 4) availableTypes.push('wolf'); if (state.player.level >= 6) availableTypes.push('skeleton');
-            let type = availableTypes[Math.floor(Math.random() * availableTypes.length)];
-            state.enemies.push(new Enemy(x, y, type));
-        }
-
+        // Each stage has a fixed enemy count. Do not spawn replacements here:
+        // continuous spawning prevented the arena from ever being cleared.
         for (let i = state.enemies.length - 1; i >= 0; i--) {
             const enemy = state.enemies[i]; enemy.update(dtModifier); 
             if (enemy.x > state.camera.x - 50 && enemy.x < state.camera.x + viewW + 50 && enemy.y > state.camera.y - 50 && enemy.y < state.camera.y + viewH + 50) { enemy.draw(ctx); }
