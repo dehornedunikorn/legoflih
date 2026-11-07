@@ -30,9 +30,10 @@ export class FloatingDamage {
 }
 
 export class Bullet {
-    constructor(x, y, vx, vy, damage, color) { 
-        this.x = x; this.y = y; this.vx = vx; this.vy = vy; 
-        this.damage = damage; this.color = color; this.radius = 5; 
+    constructor(x, y, vx, vy, damage, color, isEnemy = false) {
+        this.x = x; this.y = y; this.vx = vx; this.vy = vy;
+        this.damage = damage; this.color = color; this.radius = 5;
+        this.isEnemy = isEnemy;
     }
     draw(ctx) { 
         ctx.save();
