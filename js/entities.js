@@ -425,6 +425,7 @@ export class Enemy {
             this.maxHealth = 60 + (levelScale * 15); this.damage = 30 + (levelScale * 5);
         }
         this.speed = this.baseSpeed; this.health = this.maxHealth;
+        this.slowTimer = 0;
     }
 
     draw(ctx) {
@@ -461,35 +462,35 @@ export class Enemy {
         ctx.restore();
     }
 
-    update(dtModifier) { 
+    update(dtModifier) {
+        this.slowTimer = Math.max(0, (this.slowTimer || 0) - dtModifier);
+        this.speed = this.baseSpeed * (this.slowTimer > 0 ? 0.5 : 1);
         if (state.isMultiplayerMode && !state.isHostUser) {
             this.x += (this.targetX - this.x) * 0.15 * dtModifier;
             this.y += (this.targetY - this.y) * 0.15 * dtModifier;
         } else {
-            let targetX = state.player.x; let targetY = state.player.y;
+            let targetX = state.player.x;
+            let targetY = state.player.y;
             let minDist = Math.hypot(targetX - this.x, targetY - this.y);
-
             if (state.isMultiplayerMode) {
                 for (let key in state.remotePlayers) {
                     const guest = state.remotePlayers[key].hero;
+                    if (!guest) continue;
                     const dist = Math.hypot(guest.x - this.x, guest.y - this.y);
                     if (dist < minDist) { minDist = dist; targetX = guest.x; targetY = guest.y; }
                 }
             }
-            
-            const angle = Math.atan2(targetY - this.y, targetX - this.x); 
-            this.x += Math.cos(angle) * this.speed * dtModifier; 
-            this.y += Math.sin(angle) * this.speed * dtModifier; 
+            const angle = Math.atan2(targetY - this.y, targetX - this.x);
+            this.x += Math.cos(angle) * this.speed * dtModifier;
+            this.y += Math.sin(angle) * this.speed * dtModifier;
         }
-        this.speed = this.baseSpeed; 
 
         if (this.isBoss && state.frameCount % 120 === 0) {
-            for(let a=0; a<Math.PI*2; a += Math.PI/4) {
-                state.bullets.push(new Bullet(this.x, this.y, Math.cos(a)*5, Math.sin(a)*5, 15, '#ff0055'));
+            for (let a = 0; a < Math.PI * 2; a += Math.PI / 4) {
+                state.bullets.push(new Bullet(this.x, this.y, Math.cos(a) * 5, Math.sin(a) * 5, 15, '#ff0055'));
             }
         }
     }
-}
 
 export class XPGem {
     constructor(x, y, customId = null) { 
